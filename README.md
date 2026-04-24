@@ -83,6 +83,43 @@ docker compose up --build
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
+## Render 배포 준비
+
+이 저장소는 Render Blueprint로 무료 public demo를 만들 수 있도록 `render.yaml`을 포함합니다. 실제 리소스 생성은 Render Dashboard에서 Blueprint를 연결할 때 일어납니다.
+
+기본 Blueprint 구성:
+
+- `trafficlab-web-jinhyuk9714`: Next.js frontend public web service
+- `trafficlab-api-jinhyuk9714`: Spring Boot backend public web service
+- `trafficlab-db-jinhyuk9714`: Render Postgres free instance
+- `trafficlab-kv-jinhyuk9714`: Render Key Value free instance
+
+배포 순서:
+
+1. GitHub `main`이 최신이고 CI badge가 passing인지 확인합니다.
+2. Render Dashboard에서 **New > Blueprint**를 선택합니다.
+3. `jinhyuk9714/TrafficLab` 저장소를 연결하고 root의 `render.yaml`을 사용합니다.
+4. Blueprint sync 후 backend health를 확인합니다.
+
+```bash
+curl -fsS https://trafficlab-api-jinhyuk9714.onrender.com/actuator/health
+```
+
+5. frontend를 열고 데모 실험을 실행합니다.
+
+```bash
+open https://trafficlab-web-jinhyuk9714.onrender.com
+API_BASE_URL=https://trafficlab-api-jinhyuk9714.onrender.com ./scripts/demo-smoke.sh
+```
+
+Render service slug가 이미 사용 중이면 `render.yaml`에서 `trafficlab-api-jinhyuk9714`, `trafficlab-web-jinhyuk9714` 이름을 같은 suffix로 함께 바꿔야 합니다. 특히 frontend의 `NEXT_PUBLIC_API_BASE_URL`과 backend의 `TRAFFICLAB_CORS_ALLOWED_ORIGINS` 안에 들어 있는 `.onrender.com` URL도 같은 값으로 맞춰야 합니다.
+
+무료 plan 주의사항:
+
+- Free web service는 cold start가 있어 첫 요청 latency가 크게 튈 수 있습니다.
+- Free Key Value는 디스크 영속성이 없으므로 Redis lock 실험용으로만 사용합니다.
+- 동시성 benchmark 수치는 Render free instance 리소스와 cold start의 영향을 받습니다. 포트폴리오 수치 비교는 로컬 Docker 또는 paid/stable instance에서 다시 캡처하는 편이 더 정확합니다.
+
 ## Backend API Summary
 
 | Method | Path | Description |
@@ -272,3 +309,4 @@ docker compose config --quiet
 - 단일 애플리케이션 인스턴스 기준 SSE fan-out입니다.
 - 로컬 CPU, Docker 리소스, DB isolation, Redis latency에 따라 수치가 달라질 수 있습니다.
 - Redis lock 테스트는 기본적으로 fallback lock client를 사용합니다.
+- Render free web service는 cold start가 있고 free Key Value는 비영속적입니다.

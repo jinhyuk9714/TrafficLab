@@ -1,0 +1,71 @@
+services:
+  - type: web
+    name: trafficlab-api-jinhyuk9714
+    runtime: docker
+    plan: free
+    region: singapore
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: TRAFFICLAB_DB_HOST
+        fromDatabase:
+          name: trafficlab-db-jinhyuk9714
+          property: host
+      - key: TRAFFICLAB_DB_PORT
+        fromDatabase:
+          name: trafficlab-db-jinhyuk9714
+          property: port
+      - key: TRAFFICLAB_DB_NAME
+        fromDatabase:
+          name: trafficlab-db-jinhyuk9714
+          property: database
+      - key: TRAFFICLAB_DB_USER
+        fromDatabase:
+          name: trafficlab-db-jinhyuk9714
+          property: user
+      - key: TRAFFICLAB_DB_PASSWORD
+        fromDatabase:
+          name: trafficlab-db-jinhyuk9714
+          property: password
+      - key: SPRING_DATA_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: trafficlab-kv-jinhyuk9714
+          property: connectionString
+      - key: TRAFFICLAB_CORS_ALLOWED_ORIGINS
+        value: http://localhost:3000,http://127.0.0.1:3000,https://trafficlab-web-jinhyuk9714.onrender.com
+
+  - type: web
+    name: trafficlab-web-jinhyuk9714
+    runtime: docker
+    plan: free
+    region: singapore
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://trafficlab-api-jinhyuk9714.onrender.com
+
+  - type: keyvalue
+    name: trafficlab-kv-jinhyuk9714
+    plan: free
+    region: singapore
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+databases:
+  - name: trafficlab-db-jinhyuk9714
+    plan: free
+    region: singapore
+    databaseName: trafficlab
+    user: trafficlab
+    postgresMajorVersion: "16"
+    ipAllowList: []
