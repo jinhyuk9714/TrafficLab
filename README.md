@@ -1,8 +1,12 @@
 # TrafficLab
 
+[![TrafficLab CI](https://github.com/jinhyuk9714/TrafficLab/actions/workflows/ci.yml/badge.svg)](https://github.com/jinhyuk9714/TrafficLab/actions/workflows/ci.yml)
+
 TrafficLab은 콘서트 좌석 예약처럼 짧은 시간에 요청이 몰리는 상황을 실제로 실행하고, 동시성 제어 전략별 결과를 측정하는 풀스택 부하 실험 플랫폼입니다.
 
 MVP는 **콘서트 좌석 예약** 하나에 집중합니다. 사용자는 전략, 동시 사용자 수, 총 요청 수, 좌석 수, hotspot 여부, 인위적 처리 지연을 설정하고 실행합니다. 백엔드는 실제 예약 시도를 수행하고 저장된 결과로만 성공 수, 실패 수, 중복 예약 수, 처리량, latency percentile을 계산합니다.
+
+![TrafficLab dashboard](docs/assets/trafficlab-dashboard.png)
 
 ## 왜 만들었나
 
@@ -88,6 +92,7 @@ docker compose up --build
 | GET | `/api/experiments` | 실험 목록 조회 |
 | GET | `/api/experiments/{experimentId}` | 실험 상세 조회 |
 | POST | `/api/experiments/{experimentId}/runs` | 비동기 실행 시작 |
+| GET | `/api/experiments/{experimentId}/runs` | 실험별 실행 이력 조회 |
 | GET | `/api/runs/{runId}` | 실행 결과 요약 조회 |
 | GET | `/api/runs/{runId}/events` | SSE 이벤트 스트림 |
 | GET | `/api/runs/{runId}/reservations` | 예약 시도 페이지 조회 |
@@ -169,6 +174,45 @@ docker compose up --build
 
 8. Case Study Export의 Markdown을 포트폴리오 문서에 활용합니다.
 
+CLI로 같은 데모를 재현할 수도 있습니다.
+
+```bash
+API_BASE_URL=http://localhost:8080 ./scripts/demo-smoke.sh
+```
+
+포트 충돌을 피해서 backend를 `8081`에 띄운 경우:
+
+```bash
+API_BASE_URL=http://localhost:8081 ./scripts/demo-smoke.sh
+```
+
+## 실제 데모 결과 예시
+
+아래 값은 `scripts/demo-smoke.sh`가 실제 API로 Unsafe와 Redis Lock 실험을 실행해 출력한 형태입니다. 수치는 로컬 CPU와 Docker 리소스에 따라 달라질 수 있지만, 핵심 불변식은 같아야 합니다.
+
+```json
+{
+  "unsafe": {
+    "status": "COMPLETED",
+    "totalRequests": 120,
+    "successCount": 10,
+    "failureCount": 110,
+    "duplicateReservationCount": 9,
+    "invariantViolationCount": 1
+  },
+  "redisLock": {
+    "status": "COMPLETED",
+    "totalRequests": 120,
+    "successCount": 1,
+    "failureCount": 119,
+    "duplicateReservationCount": 0,
+    "invariantViolationCount": 0
+  }
+}
+```
+
+Unsafe는 같은 좌석에 여러 성공 예약을 만들 수 있고, Redis Lock은 같은 조건에서 중복 성공 예약을 0으로 유지합니다.
+
 ## Portfolio에서 보여주는 역량
 
 - Java/Spring 기반 도메인 모델링
@@ -197,6 +241,17 @@ cd backend
 - Markdown export는 측정값을 포함함
 
 Redis 자체 연동 테스트는 Testcontainers 의존성을 추가해 둘 수 있지만, 로컬 Docker 상태에 따라 무거워질 수 있어 MVP 기본 테스트는 in-memory lock client fallback을 사용합니다. 실제 실행에서는 `RedisDistributedLockClient`가 Redis `SET NX`와 Lua release script를 사용합니다.
+
+CI는 GitHub Actions에서 backend, frontend, infra job으로 분리해 실행합니다.
+
+```bash
+cd frontend
+npm ci
+npm run build
+
+cd ..
+docker compose config --quiet
+```
 
 ## Future Roadmap
 

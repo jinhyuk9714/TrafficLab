@@ -2,6 +2,7 @@ package com.trafficlab.api;
 
 import com.trafficlab.api.ApiDtos.ExperimentCreateRequest;
 import com.trafficlab.api.ApiDtos.ExperimentResponse;
+import com.trafficlab.api.ApiDtos.RunResponse;
 import com.trafficlab.api.ApiDtos.StartRunResponse;
 import com.trafficlab.domain.ExperimentRun;
 import com.trafficlab.experiment.ExperimentRunService;
@@ -53,5 +54,12 @@ public class ExperimentController {
     public StartRunResponse startRun(@PathVariable Long experimentId) {
         ExperimentRun run = runService.startRun(experimentId);
         return new StartRunResponse(run.getId(), run.getStatus());
+    }
+
+    @GetMapping("/{experimentId}/runs")
+    public List<RunResponse> listRuns(@PathVariable Long experimentId) {
+        return runService.listRunsForExperiment(experimentId).stream()
+                .map(RunResponse::from)
+                .toList();
     }
 }
