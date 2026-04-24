@@ -193,7 +193,8 @@ export default function Home() {
   const comparisonData = comparisonRuns.map((item) => ({
     strategy: item.strategy.replace("_", " "),
     duplicates: item.run.duplicateReservationCount,
-    throughput: Number(item.run.throughput.toFixed(1))
+    throughput: Number(item.run.throughput.toFixed(1)),
+    p95LatencyMs: item.run.p95LatencyMs
   }));
 
   async function bootstrap() {
@@ -201,10 +202,29 @@ export default function Home() {
       setError(null);
       const [scenarioList, experimentList] = await Promise.all([api.scenarios(), api.experiments()]);
       setScenarios(scenarioList);
-      setExperiments(experimentList);
+      const recentExperiments = experimentList.slice().reverse().slice(0, 8);
+      setExperiments(recentExperiments);
+      await loadComparisonRuns(recentExperiments);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "초기 데이터를 불러오지 못했습니다.");
     }
+  }
+
+  async function loadComparisonRuns(experimentList: Experiment[]) {
+    const runGroups = await Promise.all(
+      experimentList.map(async (experiment) => {
+        const runs = await api.experimentRuns(experiment.id);
+        return runs
+          .filter((item) => item.status === "COMPLETED")
+          .map((item) => ({ strategy: experiment.strategyType, run: item }));
+      })
+    );
+    setComparisonRuns(
+      runGroups
+        .flat()
+        .sort((left, right) => right.run.id - left.run.id)
+        .slice(0, 6)
+    );
   }
 
   async function startExperiment() {
@@ -221,7 +241,7 @@ export default function Home() {
       const start = await api.startRun(experiment.id);
       setActiveExperiment(experiment);
       setActiveRunId(start.runId);
-      setExperiments((current) => [experiment, ...current].slice(0, 8));
+      setExperiments((current) => [experiment, ...current.filter((item) => item.id !== experiment.id)].slice(0, 8));
       setRun({
         id: start.runId,
         experimentId: experiment.id,
@@ -538,7 +558,7 @@ export default function Home() {
                   </ChartPanel>
                   <ChartPanel title="전략 비교">
                     {comparisonData.length === 0 ? (
-                      <div className="flex h-[220px] items-center justify-center text-sm text-neutral-500">완료된 실행이 쌓이면 비교 차트가 표시됩니다.</div>
+                      <div className="flex h-[220px] items-center justify-center text-sm text-neutral-500">완료된 실행이 쌓이면 새로고침 후에도 비교 차트가 표시됩니다.</div>
                     ) : (
                       <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={comparisonData}>
@@ -548,10 +568,56 @@ export default function Home() {
                           <Tooltip />
                           <Bar dataKey="duplicates" fill="#d9952f" radius={[4, 4, 0, 0]} />
                           <Bar dataKey="throughput" fill="#171717" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="p95LatencyMs" fill="#0f9f84" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
                   </ChartPanel>
+                </div>
+
+                <div className="mt-5 overflow-hidden rounded-md border border-line">
+                  <div className="border-b border-line bg-[#fbfbf9] px-4 py-3">
+                    <div className="text-sm font-semibold">Strategy Comparison History</div>
+                    <div className="mt-1 text-xs text-neutral-500">최근 완료 실행 기준 · 중복 예약 / 처리량 / p95 지연</div>
+                  </div>
+                  <div className="max-h-56 overflow-auto">
+                    <table className="w-full min-w-[680px] border-collapse text-sm">
+                      <thead className="sticky top-0 bg-white text-left text-xs text-neutral-500">
+                        <tr>
+                          <th className="border-b border-line px-4 py-3">Run</th>
+                          <th className="border-b border-line px-4 py-3">전략</th>
+                          <th className="border-b border-line px-4 py-3">중복 예약</th>
+                          <th className="border-b border-line px-4 py-3">처리량</th>
+                          <th className="border-b border-line px-4 py-3">p95</th>
+                          <th className="border-b border-line px-4 py-3">결과</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparisonRuns.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-6 text-center text-neutral-500">
+                              완료된 실행 결과가 없습니다.
+                            </td>
+                          </tr>
+                        ) : (
+                          comparisonRuns.map((item) => (
+                            <tr key={item.run.id} className="border-b border-line/70 last:border-b-0">
+                              <td className="px-4 py-3 font-semibold">#{item.run.id}</td>
+                              <td className="px-4 py-3">{item.strategy}</td>
+                              <td className="px-4 py-3">{item.run.duplicateReservationCount}</td>
+                              <td className="px-4 py-3">{formatNumber(item.run.throughput)} /s</td>
+                              <td className="px-4 py-3">{item.run.p95LatencyMs} ms</td>
+                              <td className="px-4 py-3">
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.run.duplicateReservationCount > 0 ? "bg-coral/10 text-coral" : "bg-mint/10 text-mint"}`}>
+                                  {item.run.duplicateReservationCount > 0 ? "위반 감지" : "무결성 유지"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 <div className="mt-5 overflow-hidden rounded-md border border-line">

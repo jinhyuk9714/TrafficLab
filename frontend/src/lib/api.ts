@@ -109,6 +109,7 @@ export const api = {
     }),
   startRun: (experimentId: number) =>
     request<{ runId: number; status: RunStatus }>(`/api/experiments/${experimentId}/runs`, { method: "POST" }),
+  experimentRuns: (experimentId: number) => request<RunSummary[]>(`/api/experiments/${experimentId}/runs`),
   run: (runId: number) => request<RunSummary>(`/api/runs/${runId}`),
   reservations: (runId: number, size = 100) => request<ReservationPage>(`/api/runs/${runId}/reservations?size=${size}`),
   exportMarkdown: async (runId: number) => {

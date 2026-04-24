@@ -82,6 +82,13 @@ public class ExperimentRunService {
                 .orElseThrow(() -> new IllegalArgumentException("Run not found: " + runId));
     }
 
+    public List<ExperimentRun> listRunsForExperiment(Long experimentId) {
+        if (!experimentRepository.existsById(experimentId)) {
+            throw new IllegalArgumentException("Experiment not found: " + experimentId);
+        }
+        return runRepository.findByExperimentIdOrderByIdDesc(experimentId);
+    }
+
     private void executeRun(Long runId) {
         long started = System.nanoTime();
         try {
