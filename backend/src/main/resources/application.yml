@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: trafficlab
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/trafficlab}
+    username: ${SPRING_DATASOURCE_USERNAME:trafficlab}
+    password: ${SPRING_DATASOURCE_PASSWORD:trafficlab}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+server:
+  port: ${SERVER_PORT:8080}

@@ -1,0 +1,2 @@
+-- TrafficLab keeps schema management in Spring JPA for the MVP.
+-- This file exists so docker-compose has a stable PostgreSQL init hook.
