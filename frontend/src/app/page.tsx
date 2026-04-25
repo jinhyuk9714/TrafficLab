@@ -69,11 +69,11 @@ const presets: Array<{ name: string; description: string; payload: ExperimentPay
       name: "Hot seat race - Unsafe",
       scenarioType: "CONCERT_BOOKING",
       strategyType: "UNSAFE",
-      concurrentUsers: 80,
-      totalRequests: 500,
-      targetSeatCount: 8,
+      concurrentUsers: 60,
+      totalRequests: 120,
+      targetSeatCount: 1,
       hotspotMode: true,
-      artificialDelayMs: 25
+      artificialDelayMs: 40
     }
   },
   {
@@ -83,11 +83,11 @@ const presets: Array<{ name: string; description: string; payload: ExperimentPay
       name: "Hot seat rush - Redis Lock",
       scenarioType: "CONCERT_BOOKING",
       strategyType: "REDIS_LOCK",
-      concurrentUsers: 100,
-      totalRequests: 700,
-      targetSeatCount: 10,
+      concurrentUsers: 60,
+      totalRequests: 120,
+      targetSeatCount: 1,
       hotspotMode: true,
-      artificialDelayMs: 20
+      artificialDelayMs: 30
     }
   },
   {
@@ -97,11 +97,11 @@ const presets: Array<{ name: string; description: string; payload: ExperimentPay
       name: "Hot seat rush - Pessimistic",
       scenarioType: "CONCERT_BOOKING",
       strategyType: "PESSIMISTIC_LOCK",
-      concurrentUsers: 80,
-      totalRequests: 500,
-      targetSeatCount: 10,
+      concurrentUsers: 50,
+      totalRequests: 120,
+      targetSeatCount: 1,
       hotspotMode: true,
-      artificialDelayMs: 15
+      artificialDelayMs: 20
     }
   }
 ];
@@ -112,6 +112,8 @@ const scenarioCards = [
   { title: "Rental Reservation", status: "coming soon", detail: "예약 선점 경쟁" },
   { title: "Inventory Rush", status: "coming soon", detail: "재고 소진 이벤트" }
 ];
+
+const COLD_START_NOTICE_MS = 4000;
 
 type ComparisonRun = {
   strategy: StrategyType;
@@ -131,6 +133,7 @@ export default function Home() {
   const [markdown, setMarkdown] = useState("");
   const [comparisonRuns, setComparisonRuns] = useState<ComparisonRun[]>([]);
   const [loading, setLoading] = useState(false);
+  const [coldStartNotice, setColdStartNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -173,16 +176,38 @@ export default function Home() {
   }, [activeRunId, activeExperiment?.strategyType]);
 
   const progressPercent = useMemo(() => {
-    if (!progress || progress.totalRequests === 0) {
-      return 0;
+    if (progress && progress.totalRequests > 0) {
+      return Math.min(100, Math.round((progress.completedRequests / progress.totalRequests) * 100));
     }
-    return Math.min(100, Math.round((progress.completedRequests / progress.totalRequests) * 100));
-  }, [progress]);
+    if ((run?.status === "COMPLETED" || run?.status === "FAILED") && run.totalRequests > 0) {
+      return 100;
+    }
+    return 0;
+  }, [progress, run]);
+
+  const completedRequestsValue = useMemo(() => {
+    if (progress) {
+      return progress.completedRequests;
+    }
+    if (run?.status === "COMPLETED" || run?.status === "FAILED") {
+      return run.totalRequests;
+    }
+    return 0;
+  }, [progress, run]);
+
+  const successCountValue = progress?.successCount ?? run?.successCount ?? 0;
+  const failureCountValue = progress?.failureCount ?? run?.failureCount ?? 0;
+
+  const startButtonLabel = loading
+    ? coldStartNotice
+      ? "서버를 깨우는 중"
+      : "시작 중"
+    : "실행";
 
   const successFailureData = useMemo(() => [
-    { name: "성공", value: run?.successCount ?? progress?.successCount ?? 0, color: "#0f9f84" },
-    { name: "실패", value: run?.failureCount ?? progress?.failureCount ?? 0, color: "#e85d48" }
-  ], [progress, run]);
+    { name: "성공", value: successCountValue, color: "#0f9f84" },
+    { name: "실패", value: failureCountValue, color: "#e85d48" }
+  ], [failureCountValue, successCountValue]);
 
   const latencyData = useMemo(() => [
     { name: "p50", latency: run?.p50LatencyMs ?? 0 },
@@ -228,8 +253,13 @@ export default function Home() {
   }
 
   async function startExperiment() {
+    let noticeTimer: number | null = null;
     try {
       setLoading(true);
+      setColdStartNotice(null);
+      noticeTimer = window.setTimeout(() => {
+        setColdStartNotice("Render Free 서버를 깨우는 중입니다. 첫 실행은 1-2분 정도 걸릴 수 있습니다.");
+      }, COLD_START_NOTICE_MS);
       setError(null);
       setRun(null);
       setProgress(null);
@@ -263,6 +293,10 @@ export default function Home() {
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "실험을 시작하지 못했습니다.");
     } finally {
+      if (noticeTimer) {
+        window.clearTimeout(noticeTimer);
+      }
+      setColdStartNotice(null);
       setLoading(false);
     }
   }
@@ -295,6 +329,7 @@ export default function Home() {
   async function resetLab() {
     try {
       setLoading(true);
+      setColdStartNotice(null);
       await api.reset();
       setActiveExperiment(null);
       setActiveRunId(null);
@@ -368,12 +403,20 @@ export default function Home() {
                 type="button"
                 onClick={startExperiment}
                 disabled={loading}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 min-w-[92px] items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />} 실행
+                {loading ? <Loader2 className="animate-spin" size={16} /> : <Play size={16} />}
+                {startButtonLabel}
               </button>
             </div>
           </header>
+
+          {coldStartNotice && (
+            <div className="flex items-center gap-3 rounded-md border border-amber/50 bg-white px-4 py-3 text-sm text-ink shadow-panel">
+              <Loader2 className="animate-spin text-amber" size={18} />
+              <span>{coldStartNotice}</span>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-3 rounded-md border border-coral/40 bg-white px-4 py-3 text-sm text-coral shadow-panel">
@@ -489,9 +532,9 @@ export default function Home() {
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-4">
-                  <MiniMetric label="완료 요청" value={progress?.completedRequests ?? run?.totalRequests ?? 0} />
-                  <MiniMetric label="성공" value={progress?.successCount ?? run?.successCount ?? 0} tone="mint" />
-                  <MiniMetric label="실패" value={progress?.failureCount ?? run?.failureCount ?? 0} tone="coral" />
+                  <MiniMetric label="완료 요청" value={completedRequestsValue} />
+                  <MiniMetric label="성공" value={successCountValue} tone="mint" />
+                  <MiniMetric label="실패" value={failureCountValue} tone="coral" />
                   <MiniMetric label="현재 TPS" value={formatNumber(progress?.throughput ?? run?.throughput ?? 0)} tone="amber" />
                 </div>
 

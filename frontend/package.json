@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test:demo-ux": "node scripts/check-demo-ux.mjs",
     "start": "next start"
   },
   "dependencies": {
