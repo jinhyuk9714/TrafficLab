@@ -3,7 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TrafficLab",
-  description: "동시성 제어 전략을 실시간으로 비교하는 부하 실험 플랫폼"
+  description: "동시성 제어 전략을 실시간으로 비교하는 부하 실험 플랫폼",
+  icons: {
+    icon: "/favicon.svg"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
